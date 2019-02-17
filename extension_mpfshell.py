@@ -27,6 +27,8 @@ def find_devices(ids = [(0x1A86, 0x7523), ]):
 
 import json
 
+from mp.mpfshell import MpFileShell
+
 class KernelExtension(Extension):
 
     def __init__(self):
@@ -47,8 +49,6 @@ class KernelExtension(Extension):
         return 
 
         try:
-            from mp.mpfshell import MpFileShell
-
             self.mpfs = MpFileShell(True, True, True, True)
 
             result = find_devices()
@@ -80,7 +80,7 @@ class KernelExtension(Extension):
         self.logger.info("open_device : {}".format(dev_name))
         try:
             # data = json.loads(message.get('data'))
-            if len(dev_name) < 1:
+            if dev_name is None or len(dev_name) < 1:
                 result = find_devices()
                 if len(result) is 0:
                     self.logger.info("serial not found!")
@@ -130,21 +130,37 @@ class KernelExtension(Extension):
                 # self.logger.debug(message)
                 topic = message.get("topic")
                 if self.TOPIC in topic:
-                    data = message.get('data')
+                    data = message.get('payload')
                     if 'open' in topic:
                         message = {
                             "topic": topic, 
-                            "message": str(self.open_device(data)).rstrip()
+                            "payload": str(self.open_device(data)).rstrip()
                         }
                         self.publish(message)
                     if 'exec' in topic:
                         message = {
                             "topic": topic, 
-                            "message": str(self.exec_pycode(data)).rstrip()
+                            "payload": str(self.exec_pycode(data)).rstrip()
+                        }
+                        self.publish(message)
+                    if 'isconnected' in topic:
+                        message = {
+                            "topic": topic,
+                            "payload": str(self.mpfs._MpFileShell__is_open())
+                        }
+                        self.publish(message)
+                    if 'close' in topic:
+                        
+                        self.mpfs.do_q(None)
+                        self.mpfs = MpFileShell(True, True, True, True)
+
+                        message = {
+                            "topic": topic,
+                            "payload": str(self.mpfs._MpFileShell__is_open())
                         }
                         self.publish(message)
             except Exception as e:
                 self.logger.error(get_traceback())
-        self.mpfs.do_q()
+        self.mpfs.do_q(None)
 
 export = KernelExtension
